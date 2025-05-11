@@ -1,8 +1,8 @@
 """Providing a quote for a security from its underlying asset"""
 
 import pandas as pd
-from .yfinance_wrapper import YFinanceSecurity
-from .market_calendar import MarketCalendar
+from ._yfinance_wrapper import YFinanceSecurity
+from ._market_calendar import MarketCalendar
 
 
 class SecurityPair:
