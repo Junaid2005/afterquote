@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Synthetic after-hours quote generator"
 authors = [{ name = "Mohammad Junaid", email = "mohammadjunaiduk@gmail.com" }]
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.8"
 
 dependencies = [
