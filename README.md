@@ -1,6 +1,9 @@
 # afterquote
 
-**Synthetic after-hours quote generator based on an asset and its correlated underlying.**
+**Synthetic after-hours quote generator based on an asset and its underlying security.**
+
+[![PyPI version](https://img.shields.io/pypi/v/afterquote)](https://pypi.org/project/afterquote/)
+[![CI](https://github.com/Junaid2005/afterquote/actions/workflows/pipelines.yml/badge.svg)](https://github.com/Junaid2005/afterquote/actions/workflows/pipelines.yml)
 
 ---
 
@@ -12,7 +15,7 @@
 
 ## 🚀 Installation
 
-### From PyPI (planned):
+### From PyPI:
 ```bash
 pip install afterquote
 ```
