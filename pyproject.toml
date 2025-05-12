@@ -1,6 +1,6 @@
 [project]
 name = "afterquote"
-version = "0.1.2"
+version = "0.1.3"
 description = "Synthetic after-hours quote generator"
 authors = [{ name = "Mohammad Junaid", email = "mohammadjunaiduk@gmail.com" }]
 readme = "README.md"
