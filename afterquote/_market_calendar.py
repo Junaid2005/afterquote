@@ -47,8 +47,8 @@ class MarketCalendar:
         except (ValueError, IndexError):
             return False
 
-    def get_closing_time(self, yf_exchange_name) -> pd.Timestamp:
-        """Returns last closing time of the exchange"""
+    def get_closing_time(self, yf_exchange_name: str) -> pd.Timestamp:
+        """Returns last closing time of the exchange in its native timezone"""
 
         exchange = self.__get_calendar(yf_exchange_name)
         schedule = exchange.schedule(
@@ -60,17 +60,17 @@ class MarketCalendar:
 
         for close in recent_closes:
             if close < datetime.now(pytz.utc):
-                return close
+                return close.astimezone(exchange.tz)
 
         raise ValueError("Cannot find the last market close")
 
-    def get_exchange_tz(self, yf_exchange_name) -> pytz.tzinfo.BaseTzInfo:
+    def get_exchange_tz(self, yf_exchange_name: str) -> pytz.tzinfo.BaseTzInfo:
         """Returns the timezone for a given exchange"""
 
         cal = self.__get_calendar(yf_exchange_name)
         return cal.tz
 
-    def __get_calendar(self, yf_exchange_name) -> mcal.MarketCalendar:
+    def __get_calendar(self, yf_exchange_name: str) -> mcal.MarketCalendar:
         """Retrieves a pandas_market_calendars calendar for the given exchange name"""
 
         try:

@@ -6,7 +6,7 @@ from ._market_calendar import MarketCalendar
 
 
 class SecurityPair:
-    """Class holding the leveraged etf and its underlying security"""
+    """Class holding the base asset and its underlying security"""
 
     def __init__(self, base, underlying):
         self.base_yf = YFinanceSecurity(base)
@@ -35,12 +35,58 @@ class SecurityPair:
             self.base_yf.get_exchange()
         ) and self.calendar.is_exchange_open(self.underlying_yf.get_exchange())
 
-    def quote(self) -> pd.DataFrame:
-        """Returns a df with the latest possible quote for the underlying security"""
+    def info(self) -> pd.DataFrame:
+        """Returns a df with the latest info for the base security"""
 
-        if self.is_pair_fully_live():
+        if self.calendar.is_exchange_open(self.base_yf.get_exchange()):
+            last_price_time = self.base_yf.get_price_at(pd.Timestamp.now())
+            df = pd.DataFrame(
+                [
+                    {
+                        "base_security": self.base_yf.ticker,
+                        "underlying_security": self.underlying_yf.ticker,
+                        "base_is_live": True,  # The base security is currently live
+                        "leverage": self.base_yf.get_leverage(),
+                        "quote_time": last_price_time.name,
+                    }
+                ]
+            )
+            df.set_index("quote_time", inplace=True)
+            return df
+
+        # Get the last closing time of the base security
+        close_time = self.calendar.get_closing_time(self.base_yf.get_exchange())
+        close_price = self.base_yf.get_price_at(close_time).Close
+
+        pricing_data = self.pricing()
+
+        change = pricing_data["Impl_Close"].iloc[-1] - pricing_data["Impl_Open"].iloc[0]
+        leveraged_return = (change / pricing_data["Impl_Open"].iloc[0]) * 100
+
+        df = pd.DataFrame(
+            [
+                {
+                    "base_security": self.base_yf.ticker,
+                    "underlying_security": self.underlying_yf.ticker,
+                    "base_is_live": False,  # The base security is currently closed
+                    "leverage": self.base_yf.get_leverage(),
+                    "base_close_time": pricing_data.index[0],
+                    "base_close_price": close_price,
+                    "adj_percent_return": leveraged_return,
+                    "quote_time": pricing_data.index[-1],
+                    "quote_price": pricing_data["Impl_Close"].iloc[-1],
+                }
+            ]
+        )
+        df.set_index("quote_time", inplace=True)
+        return df
+
+    def pricing(self, interval: str = "1m") -> pd.DataFrame:
+        """Returns a df with the calculated extended hours pricing for the base security"""
+
+        if self.calendar.is_exchange_open(self.base_yf.get_exchange()):
             raise RuntimeError(
-                "Cannot compute synthetic return — both securities are currently trading."
+                "Cannot compute synthetic return — the base security is already live."
             )
 
         # Get the last closing time of the base security
@@ -53,36 +99,38 @@ class SecurityPair:
         # The close of the base security is our start for the underlying security
         start_time = close_time.astimezone(target_timezone)
 
-        # Get the start price of the underlying security
-        start_price = self.underlying_yf.get_price_at(start_time)
-        # Get the current price of the underlying security
-        live_data = self.underlying_yf.yf_ticker.history(
-            period="5d", interval="1m", prepost=True
+        underlying_pricing = self.underlying_yf.yf_ticker.history(
+            start=start_time, interval=interval, prepost=True
         )
-        latest_price = live_data["Close"].iloc[-1]
-        latest_time = live_data.index[-1]
 
-        # Calculate the percentage return of the underlying security
-        change = latest_price - start_price
-        percent_return = (change / start_price) * 100
+        # Change timezone to that of the base security
+        synthetic_pricing = pd.DataFrame(index=underlying_pricing.index)
+        synthetic_pricing = synthetic_pricing.tz_convert(
+            self.calendar.get_exchange_tz(self.base_yf.get_exchange())
+        )
 
         leverage_factor = self.base_yf.get_leverage()
-        leveraged_return = percent_return * leverage_factor
 
-        # Calculate the quote price based on the leveraged return
-        quote_price = close_price * (1 + (leveraged_return / 100))
+        # Iteratively generate synthetic pricing
+        for col in ["Open", "Close"]:
+            change_series = underlying_pricing[col].pct_change()
+            synthetic_pricing[f"Impl_{col}"] = (
+                close_price[col]
+                * (1 + (leverage_factor * change_series.fillna(0))).cumprod()
+            )
 
-        return pd.DataFrame(
-            [
-                {
-                    "base_security": self.base_yf.ticker,
-                    "underlying_security": self.underlying_yf.ticker,
-                    "leverage": leverage_factor,
-                    "base_close_time": start_time,
-                    "base_close_price": close_price,
-                    "adj_percent_return": leveraged_return,
-                    "quote_time": latest_time,
-                    "quote_price": quote_price,
-                }
-            ]
-        )
+        # Scaling the high and low prices
+        for col in ["High", "Low"]:
+            relative_diff = (
+                underlying_pricing[col] - underlying_pricing["Open"]
+            ) / underlying_pricing["Open"]
+            synthetic_pricing[f"Impl_{col}"] = synthetic_pricing["Impl_Open"] * (
+                1 + (relative_diff)
+            )
+
+        # Reordering column names to match yfinance history method
+        synthetic_pricing = synthetic_pricing[
+            ["Impl_Open", "Impl_High", "Impl_Low", "Impl_Close"]
+        ]
+
+        return synthetic_pricing
