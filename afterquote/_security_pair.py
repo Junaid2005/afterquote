@@ -105,9 +105,9 @@ class SecurityPair:
 
         # Change timezone to that of the base security
         synthetic_pricing = pd.DataFrame(index=underlying_pricing.index)
-        synthetic_pricing = synthetic_pricing.tz_convert(self.calendar.get_exchange_tz(
-            self.base_yf.get_exchange()
-        ))
+        synthetic_pricing = synthetic_pricing.tz_convert(
+            self.calendar.get_exchange_tz(self.base_yf.get_exchange())
+        )
 
         leverage_factor = self.base_yf.get_leverage()
 
