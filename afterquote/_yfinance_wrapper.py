@@ -57,8 +57,8 @@ class YFinanceSecurity:
             raise ValueError(f"Exchange not found for {self.ticker}")
         return exchange_name
 
-    def get_price_at(self, timestamp: pd.Timestamp) -> float:
-        """Fetches the price closest to the given timestamp using 1-minute interval data"""
+    def get_price_at(self, timestamp: pd.Timestamp) -> pd.Series:
+        """Fetches a row of price data closest to the given timestamp using 1m interval data"""
 
         data = self.yf_ticker.history(
             start=timestamp - timedelta(minutes=5),
@@ -71,8 +71,5 @@ class YFinanceSecurity:
                 f"No pricing data for {self.ticker} found around {timestamp.isoformat()}"
             )
         if timestamp in data.index:
-            price = data.loc[timestamp].Open
-        else:
-            price = data.iloc[0].Open
-
-        return price
+            return data.loc[[timestamp]].iloc[0]  # always returns a Series
+        return data.iloc[0]
