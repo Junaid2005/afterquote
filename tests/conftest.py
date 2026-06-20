@@ -4,8 +4,6 @@ import pandas as pd
 import pytz
 import pytest
 
-from afterquote._yfinance_wrapper import YFinanceSecurity
-from afterquote._market_calendar import MarketCalendar
 from afterquote._security_pair import SecurityPair
 
 
@@ -72,10 +70,10 @@ def make_ohlc(rows, start="2026-06-18 11:30", freq="1min", tz="America/New_York"
     """Build a fake OHLC DataFrame from a list of (O, H, L, C) tuples."""
     index = pd.date_range(start, periods=len(rows), freq=freq, tz=tz)
     data = {"Open": [], "High": [], "Low": [], "Close": []}
-    for o, h, l, c in rows:
+    for o, h, low, c in rows:
         data["Open"].append(o)
         data["High"].append(h)
-        data["Low"].append(l)
+        data["Low"].append(low)
         data["Close"].append(c)
     return pd.DataFrame(data, index=index)
 

@@ -16,8 +16,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
-    "pylint",
+    "ruff",
+    "mypy",
 ]
 test = [
     "pytest",

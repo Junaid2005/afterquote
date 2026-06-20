@@ -31,7 +31,7 @@ class TestInfoLive:
             close_time=pd.Timestamp("2026-06-18 16:30:00+01:00"),
         )
         info = pair.info()
-        assert info["base_is_live"].iloc[0] == True
+        assert bool(info["base_is_live"].iloc[0])
         assert "adj_percent_return" not in info.columns
 
 
@@ -40,9 +40,8 @@ class TestInfoSynthetic:
 
     def test_synthetic_has_adj_return(self, simple_pair):
         info = simple_pair.info()
-        assert info["base_is_live"].iloc[0] == False
+        assert not bool(info["base_is_live"].iloc[0])
         assert "adj_percent_return" in info.columns
-        assert "quote_price" in info.columns
 
     def test_quote_price_is_last_impl_close(self, simple_pair):
         info = simple_pair.info()
@@ -76,7 +75,7 @@ class TestInfoNoData:
             close_time=pd.Timestamp("2026-06-18 16:30:00+01:00"),
         )
         info = pair.info()
-        assert info["base_is_live"].iloc[0] == False
+        assert not bool(info["base_is_live"].iloc[0])
         assert "adj_percent_return" not in info.columns
         assert info["quote_price"].iloc[0] == info["base_close_price"].iloc[0]
         assert info["quote_price"].iloc[0] == 200.0

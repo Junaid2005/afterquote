@@ -1,10 +1,9 @@
 """Tests for ticker validation — fake tickers should be rejected."""
 
 import pandas as pd
-import pytest
 
 from afterquote._security_pair import SecurityPair
-from tests.conftest import FakeYFinanceSecurity, make_ohlc
+from tests.conftest import FakeYFinanceSecurity
 
 REAL_INFO = {
     "longName": "Real Thing",
