@@ -25,6 +25,13 @@ class MarketCalendar:
         "NMS": "NASDAQ",
         "NGM": "NASDAQ",
         "BTS": "BATS",
+        "PCX": "NYSE",
+        "NYQ": "NYSE",
+        "AMS": "XAMS",
+        "GER": "XFRA",
+        "HKG": "XHKG",
+        "NSI": "XNSE",
+        "TOR": "TSX",
     }
 
     def __init__(self):

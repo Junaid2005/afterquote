@@ -1,6 +1,6 @@
 [project]
 name = "afterquote"
-version = "0.2.1"
+version = "0.3.0"
 description = "Synthetic after-hours quote generator"
 authors = [{ name = "Mohammad Junaid", email = "mohammadjunaiduk@gmail.com" }]
 readme = "README.md"
@@ -8,18 +8,25 @@ license = "MIT"
 requires-python = ">=3.8"
 
 dependencies = [
-    "yfinance",
-    "pandas",
-    "pytz",
-    "pandas_market_calendars"
+    "yfinance>=1.4.1",
+    "pandas>=2.0",
+    "pytz>=2024",
+    "pandas_market_calendars>=5.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black",
-    "pylint",
+    "ruff",
+    "mypy",
+    "pre-commit",
+]
+test = [
+    "pytest",
 ]
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.mypy]
+ignore_missing_imports = true
