@@ -60,7 +60,7 @@ class YFinanceSecurity:
         """Fetches a row of price data closest to the given timestamp using 1m interval data"""
 
         data = self.yf_ticker.history(
-            start=timestamp - timedelta(minutes=5),
+            start=timestamp - timedelta(minutes=30),
             end=timestamp + timedelta(minutes=5),
             interval="1m",
             prepost=True,
@@ -71,4 +71,4 @@ class YFinanceSecurity:
             )
         if timestamp in data.index:
             return data.loc[[timestamp]].iloc[0]  # always returns a Series
-        return data.iloc[0]
+        return data.iloc[-1]
