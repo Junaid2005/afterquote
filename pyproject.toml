@@ -19,6 +19,9 @@ dev = [
     "black",
     "pylint",
 ]
+test = [
+    "pytest",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
