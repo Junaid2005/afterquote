@@ -100,7 +100,10 @@ class SecurityPair:
         start_time = close_time.astimezone(target_timezone)
 
         underlying_pricing = self.underlying_yf.yf_ticker.history(
-            start=start_time, interval=interval, prepost=True
+            start=start_time,
+            end=pd.Timestamp.now(tz=target_timezone),
+            interval=interval,
+            prepost=True,
         )
 
         # Change timezone to that of the base security
