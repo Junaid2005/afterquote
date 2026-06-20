@@ -18,8 +18,7 @@ class YFinanceSecurity:
         """Returns whether yfinance found the ticker"""
 
         try:
-            self.yf_ticker.info.get("longName")
-            return True
+            return bool(self.yf_ticker.info.get("longName"))
         except AttributeError:
             return False
 
