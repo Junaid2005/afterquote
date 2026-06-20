@@ -110,14 +110,25 @@ class SecurityPair:
         )
 
         leverage_factor = self.base_yf.get_leverage()
+        anchor_price = close_price["Close"]
 
-        # Iteratively generate synthetic pricing
-        for col in ["Open", "Close"]:
-            change_series = underlying_pricing[col].pct_change()
-            synthetic_pricing[f"Impl_{col}"] = (
-                close_price[col]
-                * (1 + (leverage_factor * change_series.fillna(0))).cumprod()
-            )
+        # Gap from the underlying's prev close to this bar's open
+        open_gap = (
+            underlying_pricing["Open"] / underlying_pricing["Close"].shift()
+        ).fillna(1)
+        intra_close = (
+            underlying_pricing["Close"] - underlying_pricing["Open"]
+        ) / underlying_pricing["Open"]
+
+        gap_return = 1 + leverage_factor * (open_gap - 1)
+        intra_return = 1 + leverage_factor * intra_close
+        total_bar_return = gap_return * intra_return
+
+        cumulative_close = anchor_price * total_bar_return.cumprod()
+        synthetic_pricing["Impl_Open"] = (
+            cumulative_close.shift().fillna(anchor_price) * gap_return
+        )
+        synthetic_pricing["Impl_Close"] = synthetic_pricing["Impl_Open"] * intra_return
 
         # Scaling the high and low prices
         for col in ["High", "Low"]:
@@ -125,7 +136,7 @@ class SecurityPair:
                 underlying_pricing[col] - underlying_pricing["Open"]
             ) / underlying_pricing["Open"]
             synthetic_pricing[f"Impl_{col}"] = synthetic_pricing["Impl_Open"] * (
-                1 + (relative_diff)
+                1 + leverage_factor * relative_diff
             )
 
         # Reordering column names to match yfinance history method
