@@ -57,11 +57,14 @@ class SecurityPair:
             self.base_yf.get_exchange()
         ) and self.calendar.is_exchange_open(self.underlying_yf.get_exchange())
 
-    def info(self) -> pd.DataFrame:
+    def info(self, as_of: Optional[pd.Timestamp] = None) -> pd.DataFrame:
         """Returns a df with the latest info for the base security"""
 
-        if self.calendar.is_exchange_open(self.base_yf.get_exchange()):
-            last_price_time = self.base_yf.get_price_at(pd.Timestamp.now())
+        if as_of is None:
+            as_of = pd.Timestamp.now(tz="UTC")
+
+        if self.calendar.is_exchange_open(self.base_yf.get_exchange(), as_of):
+            last_price_time = self.base_yf.get_price_at(as_of)
             return QuoteInfo(
                 base_security=self.base_yf.ticker,
                 underlying_security=self.underlying_yf.ticker,
@@ -70,10 +73,10 @@ class SecurityPair:
                 quote_time=last_price_time.name,
             ).to_frame()
 
-        close_time = self.calendar.get_closing_time(self.base_yf.get_exchange())
+        close_time = self.calendar.get_closing_time(self.base_yf.get_exchange(), as_of)
         close_price = self.base_yf.get_price_at(close_time).Close
 
-        pricing_data = self.pricing()
+        pricing_data = self.pricing(as_of=as_of)
 
         if pricing_data.empty:
             # Underlying has no trading data after the base's last close — the
@@ -104,16 +107,21 @@ class SecurityPair:
             quote_price=pricing_data["Impl_Close"].iloc[-1],
         ).to_frame()
 
-    def pricing(self, interval: str = "1m") -> pd.DataFrame:
+    def pricing(
+        self, interval: str = "1m", as_of: Optional[pd.Timestamp] = None
+    ) -> pd.DataFrame:
         """Returns a df with the calculated extended hours pricing for the base security"""
 
-        if self.calendar.is_exchange_open(self.base_yf.get_exchange()):
+        if as_of is None:
+            as_of = pd.Timestamp.now(tz="UTC")
+
+        if self.calendar.is_exchange_open(self.base_yf.get_exchange(), as_of):
             raise RuntimeError(
                 "Cannot compute synthetic return — the base security is already live."
             )
 
         # Get the last closing time of the base security
-        close_time = self.calendar.get_closing_time(self.base_yf.get_exchange())
+        close_time = self.calendar.get_closing_time(self.base_yf.get_exchange(), as_of)
         close_price = self.base_yf.get_price_at(close_time)
         # Convert that to the timezone of the underlying security
         target_timezone = self.calendar.get_exchange_tz(
@@ -121,10 +129,11 @@ class SecurityPair:
         )
         # The close of the base security is our start for the underlying security
         start_time = close_time.astimezone(target_timezone)
+        end_time = as_of.astimezone(target_timezone)
 
         underlying_pricing = self.underlying_yf.yf_ticker.history(
             start=start_time,
-            end=pd.Timestamp.now(tz=target_timezone),
+            end=end_time,
             interval=interval,
             prepost=True,
         )

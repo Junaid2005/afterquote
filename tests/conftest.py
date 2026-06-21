@@ -59,7 +59,7 @@ class FakeMarketCalendar:
             return self._base_open
         return self._underlying_open
 
-    def get_closing_time(self, exchange) -> pd.Timestamp:
+    def get_closing_time(self, exchange, as_of=None) -> pd.Timestamp:
         return self._close_time
 
     def get_exchange_tz(self, exchange):

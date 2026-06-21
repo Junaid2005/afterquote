@@ -1,6 +1,7 @@
 """Market calendar logic, to find open/close and trading days"""
 
 from datetime import datetime, timedelta
+from typing import Optional
 import pandas as pd
 import pandas_market_calendars as mcal
 import pytz
@@ -40,33 +41,42 @@ class MarketCalendar:
     def is_exchange_open(
         self,
         yf_exchange_name,
-        timestamp: pd.Timestamp = pd.Timestamp(datetime.now(pytz.utc)),
+        timestamp: Optional[pd.Timestamp] = None,
     ) -> bool:
         """Checks if an exchange is trading at a given timestamp"""
 
-        cal = self.__get_calendar(yf_exchange_name)
-        schedule = self.__get_schedule(cal)
+        if timestamp is None:
+            timestamp = pd.Timestamp(datetime.now(pytz.utc))
 
+        cal = self.__get_calendar(yf_exchange_name)
         converted_timestamp = timestamp.tz_convert(cal.tz)
+        ts_date = converted_timestamp.date()
+        schedule = self.__get_schedule(cal, start=ts_date, end=ts_date)
 
         try:
             return cal.open_at_time(schedule, converted_timestamp)
         except (ValueError, IndexError):
             return False
 
-    def get_closing_time(self, yf_exchange_name: str) -> pd.Timestamp:
-        """Returns last closing time of the exchange in its native timezone"""
+    def get_closing_time(
+        self, yf_exchange_name: str, as_of: Optional[pd.Timestamp] = None
+    ) -> pd.Timestamp:
+        """Returns last closing time of the exchange before as_of (or now) in its native timezone"""
+
+        reference = as_of if as_of is not None else pd.Timestamp.now(tz="UTC")
+        if reference.tz is None:
+            reference = reference.tz_localize("UTC")
 
         exchange = self.__get_calendar(yf_exchange_name)
         schedule = exchange.schedule(
-            start_date=datetime.now().today() - timedelta(days=5),
-            end_date=datetime.now().today(),
+            start_date=reference.date() - timedelta(days=5),
+            end_date=reference.date(),
         )
         recent_closes = schedule[-2:]["market_close"].tolist()
         recent_closes.reverse()
 
         for close in recent_closes:
-            if close < datetime.now(pytz.utc):
+            if close < reference:
                 return close.astimezone(exchange.tz)
 
         raise ValueError("Cannot find the last market close")
@@ -93,10 +103,15 @@ class MarketCalendar:
     def __get_schedule(
         self,
         exchange_cal: mcal.MarketCalendar,
-        start=datetime.now().today(),
-        end=datetime.now().today(),
+        start=None,
+        end=None,
     ) -> pd.DataFrame:
         """Retrieves a schedule for a pandas market calendar"""
+        today = datetime.now().date()
+        if start is None:
+            start = today
+        if end is None:
+            end = today
         try:
             return exchange_cal.schedule(
                 start_date=start, end_date=end, start="pre", end="post"
