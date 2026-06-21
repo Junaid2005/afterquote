@@ -47,6 +47,14 @@ class YFinanceSecurity:
             raise ValueError(f"Timezone not found for {self.ticker}")
         return pytz.timezone(timezone_name)
 
+    def get_currency(self) -> str:
+        """Returns the ISO currency code for a security (normalises GBp -> GBP)"""
+
+        currency = self.yf_ticker.info.get("currency", "")
+        if not currency:
+            raise ValueError(f"Currency not found for {self.ticker}")
+        return currency.upper()
+
     def get_exchange(self) -> str:
         """Returns the exchange for a security"""
 

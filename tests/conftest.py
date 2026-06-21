@@ -30,6 +30,9 @@ class FakeYFinanceSecurity:
     def get_timezone(self):
         return pytz.timezone(self._info["timeZoneFullName"])
 
+    def get_currency(self) -> str:
+        return self._info.get("currency", "USD").upper()
+
     def get_exchange(self) -> str:
         return self._info["exchange"]
 
@@ -87,6 +90,7 @@ def make_security_pair(
     underlying_open=True,
     close_time=None,
     tz="America/New_York",
+    fx_history=None,
 ):
     """Build a SecurityPair with fakes wired in — no network calls."""
     pair = SecurityPair.__new__(SecurityPair)
@@ -95,6 +99,10 @@ def make_security_pair(
         "UNDER", underlying_info, underlying_history
     )
     pair.calendar = FakeMarketCalendar(base_open, underlying_open, close_time, tz)
+    # Inject fake FX security when provided — prevents any network calls in FX path
+    pair.ccy_pair_yf = (
+        FakeYFinanceSecurity("FX", {}, fx_history) if fx_history is not None else None
+    )
     return pair
 
 

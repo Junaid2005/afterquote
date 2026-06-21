@@ -41,6 +41,27 @@ class SecurityPair:
             )
 
         self.calendar = MarketCalendar()
+        base_ccy = self.base_yf.get_currency()
+        underlying_ccy = self.underlying_yf.get_currency()
+        if base_ccy != underlying_ccy:
+            self.ccy_pair_yf: Optional[YFinanceSecurity] = YFinanceSecurity(
+                f"{underlying_ccy}{base_ccy}=X"
+            )
+        else:
+            self.ccy_pair_yf = None
+
+    @staticmethod
+    def _candle_returns(
+        opens: pd.Series, closes: pd.Series, leverage: int = 1
+    ) -> tuple[pd.Series, pd.Series]:
+        """Decomposes a price series into (gap_return, intra_return) with optional leverage.
+
+        gap_return  — inter-bar move (open vs prev close), leveraged
+        intra_return — intra-bar move (close vs open), leveraged
+        """
+        gap = (opens / closes.shift()).fillna(1)
+        intra = closes / opens
+        return 1 + leverage * (gap - 1), 1 + leverage * (intra - 1)
 
     def is_valid_pair(self) -> bool:
         """Returns if both of the tickers provided are found by yfinance"""
@@ -148,30 +169,45 @@ class SecurityPair:
         anchor_price = close_price["Close"]
 
         # Gap from the underlying's prev close to this bar's open
-        open_gap = (
-            underlying_pricing["Open"] / underlying_pricing["Close"].shift()
-        ).fillna(1)
-        intra_close = (
-            underlying_pricing["Close"] - underlying_pricing["Open"]
-        ) / underlying_pricing["Open"]
-
-        gap_return = 1 + leverage_factor * (open_gap - 1)
-        intra_return = 1 + leverage_factor * intra_close
-        total_bar_return = gap_return * intra_return
-
-        cumulative_close = anchor_price * total_bar_return.cumprod()
-        synthetic_pricing["Impl_Open"] = (
-            cumulative_close.shift().fillna(anchor_price) * gap_return
+        und_gap, und_intra = self._candle_returns(
+            underlying_pricing["Open"], underlying_pricing["Close"], leverage_factor
         )
-        synthetic_pricing["Impl_Close"] = synthetic_pricing["Impl_Open"] * intra_return
+
+        # FX adjustment: applied as a 1x leg when base and underlying trade in different currencies
+        if self.ccy_pair_yf is not None:
+            fx_data = (
+                self.ccy_pair_yf.yf_ticker.history(
+                    start=start_time, end=end_time, interval=interval, prepost=True
+                )
+                .reindex(underlying_pricing.index)
+                .ffill()
+                .bfill()
+            )
+            # Same gap/intra decomposition as underlying, but always 1x (unhedged assumption)
+            fx_gap, fx_intra = self._candle_returns(fx_data["Open"], fx_data["Close"])
+        else:
+            fx_gap = fx_intra = pd.Series(1.0, index=underlying_pricing.index)
+
+        total_gap = und_gap * fx_gap
+        total_return = und_gap * fx_gap * und_intra * fx_intra
+
+        cumulative_close = anchor_price * total_return.cumprod()
+        synthetic_pricing["Impl_Open"] = (
+            cumulative_close.shift().fillna(anchor_price) * total_gap
+        )
+        synthetic_pricing["Impl_Close"] = (
+            synthetic_pricing["Impl_Open"] * und_intra * fx_intra
+        )
 
         # Scaling the high and low prices
         for col in ["High", "Low"]:
             relative_diff = (
                 underlying_pricing[col] - underlying_pricing["Open"]
             ) / underlying_pricing["Open"]
-            synthetic_pricing[f"Impl_{col}"] = synthetic_pricing["Impl_Open"] * (
-                1 + leverage_factor * relative_diff
+            synthetic_pricing[f"Impl_{col}"] = (
+                synthetic_pricing["Impl_Open"]
+                * (1 + leverage_factor * relative_diff)
+                * fx_intra
             )
 
         # Reordering column names to match yfinance history method
