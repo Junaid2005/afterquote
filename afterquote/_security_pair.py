@@ -152,11 +152,8 @@ class SecurityPair:
         start_time = close_time.astimezone(target_timezone)
         end_time = as_of.astimezone(target_timezone)
 
-        underlying_pricing = self.underlying_yf.yf_ticker.history(
-            start=start_time,
-            end=end_time,
-            interval=interval,
-            prepost=True,
+        underlying_pricing = self.underlying_yf.get_history(
+            start=start_time, end=end_time, interval=interval
         )
 
         # Change timezone to that of the base security
@@ -176,8 +173,8 @@ class SecurityPair:
         # FX adjustment: applied as a 1x leg when base and underlying trade in different currencies
         if self.ccy_pair_yf is not None:
             fx_data = (
-                self.ccy_pair_yf.yf_ticker.history(
-                    start=start_time, end=end_time, interval=interval, prepost=True
+                self.ccy_pair_yf.get_history(
+                    start=start_time, end=end_time, interval=interval
                 )
                 .reindex(underlying_pricing.index)
                 .ffill()

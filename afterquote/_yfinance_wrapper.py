@@ -1,10 +1,21 @@
 """Used for querying information and pricing for securities"""
 
+import functools
 import re
 from datetime import timedelta
 import pandas as pd
 import pytz
 import yfinance as yf
+
+
+@functools.lru_cache(maxsize=128)
+def _fetch_history(
+    ticker: str, start: pd.Timestamp, end: pd.Timestamp, interval: str
+) -> pd.DataFrame:
+    """Cached yfinance history fetch — keyed by ticker + window + interval."""
+    return yf.Ticker(ticker).history(
+        start=start, end=end, interval=interval, prepost=True
+    )
 
 
 class YFinanceSecurity:
@@ -13,6 +24,12 @@ class YFinanceSecurity:
     def __init__(self, ticker):
         self.ticker = ticker
         self.yf_ticker = yf.Ticker(ticker)
+
+    def get_history(
+        self, start: pd.Timestamp, end: pd.Timestamp, interval: str = "1m"
+    ) -> pd.DataFrame:
+        """Fetches history for an explicit window — always cached (explicit start/end is deterministic)."""
+        return _fetch_history(self.ticker, start, end, interval)
 
     def is_real_security(self) -> bool:
         """Returns whether yfinance found the ticker"""
@@ -41,8 +58,7 @@ class YFinanceSecurity:
     def get_timezone(self) -> pytz.tzinfo.BaseTzInfo:
         """Returns a pytz timezone for a security"""
 
-        info = self.yf_ticker.info
-        timezone_name = info.get("timeZoneFullName")
+        timezone_name = self.yf_ticker.info.get("timeZoneFullName")
         if not timezone_name:
             raise ValueError(f"Timezone not found for {self.ticker}")
         return pytz.timezone(timezone_name)
@@ -58,8 +74,7 @@ class YFinanceSecurity:
     def get_exchange(self) -> str:
         """Returns the exchange for a security"""
 
-        info = self.yf_ticker.info
-        exchange_name = info.get("exchange")
+        exchange_name = self.yf_ticker.info.get("exchange")
         if not exchange_name:
             raise ValueError(f"Exchange not found for {self.ticker}")
         return exchange_name

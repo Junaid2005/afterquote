@@ -21,6 +21,9 @@ class FakeYFinanceSecurity:
     def history(self, start=None, end=None, interval="1m", prepost=True):
         return self._history
 
+    def get_history(self, start=None, end=None, interval="1m"):
+        return self._history
+
     def is_real_security(self) -> bool:
         return bool(self._info.get("longName"))
 
