@@ -1,11 +1,11 @@
 [project]
 name = "afterquote"
-version = "0.3.0"
+version = "1.0.0"
 description = "Synthetic after-hours quote generator"
 authors = [{ name = "Mohammad Junaid", email = "mohammadjunaiduk@gmail.com" }]
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 dependencies = [
     "yfinance>=1.4.1",
