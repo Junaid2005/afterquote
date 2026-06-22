@@ -1,5 +1,6 @@
 """Providing a quote for a security from its underlying asset"""
 
+import warnings
 from dataclasses import dataclass, asdict
 from typing import Optional
 
@@ -80,6 +81,37 @@ class SecurityPair:
         return self.calendar.is_exchange_open(
             self.base_yf.get_exchange()
         ) and self.calendar.is_exchange_open(self.underlying_yf.get_exchange())
+
+    def correlation(self, days: int = 90, warn: bool = True) -> float:
+        """Pearson correlation of daily returns between base and underlying.
+
+        Emits UserWarning when |corr| < 0.5 — the pair may be unsuitable.
+        """
+        end = pd.Timestamp.now(tz="UTC")
+        start = end - pd.Timedelta(days=days)
+        base = self.base_yf.get_history(start=start, end=end, interval="1d")["Close"]
+        und = self.underlying_yf.get_history(start=start, end=end, interval="1d")[
+            "Close"
+        ]
+        base_ret = base.pct_change().dropna()
+        und_ret = und.pct_change().dropna()
+        if (
+            len(base_ret) < 2
+            or len(und_ret) < 2
+            or base_ret.std() == 0
+            or und_ret.std() == 0
+        ):
+            return float("nan")
+        corr = float(base_ret.corr(und_ret))
+        if warn and abs(corr) < 0.5:
+            warnings.warn(
+                f"Low correlation ({corr:.2f}) — synthetic pricing for "
+                f"{self.base_yf.ticker} from {self.underlying_yf.ticker} "
+                f"may be unreliable",
+                UserWarning,
+                stacklevel=2,
+            )
+        return corr
 
     def info(
         self,

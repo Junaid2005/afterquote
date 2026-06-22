@@ -74,11 +74,11 @@ def benchmark(pair: SecurityPair, days: int = 90) -> pd.DataFrame:
 def metrics(results: pd.DataFrame) -> dict:
     """Compute accuracy metrics from benchmark results, skipping NaN rows."""
     valid = results.dropna(subset=["residual", "direction_correct"])
-    r = valid["residual"]
+    residuals = valid["residual"]
     return {
-        "rmse": float(np.sqrt((r**2).mean())),
-        "mae": float(r.abs().mean()),
+        "rmse": float(np.sqrt((residuals**2).mean())),
+        "mae": float(residuals.abs().mean()),
         "direction_correct": float(valid["direction_correct"].mean()),
-        "tracking_error": float(r.std()),
+        "tracking_error": float(residuals.std()),
         "n": len(valid),
     }
