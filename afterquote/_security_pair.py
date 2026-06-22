@@ -89,12 +89,12 @@ class SecurityPair:
         """
         end = pd.Timestamp.now(tz="UTC")
         start = end - pd.Timedelta(days=days)
-        base = self.base_yf.get_history(start=start, end=end, interval="1d")["Close"]
-        und = self.underlying_yf.get_history(start=start, end=end, interval="1d")[
-            "Close"
-        ]
-        base_ret = base.pct_change().dropna()
-        und_ret = und.pct_change().dropna()
+        base = self.base_yf.get_history(start=start, end=end, interval="1d")
+        und = self.underlying_yf.get_history(start=start, end=end, interval="1d")
+        base.index = base.index.normalize().tz_localize(None)
+        und.index = und.index.normalize().tz_localize(None)
+        base_ret = base["Close"].pct_change().dropna()
+        und_ret = und["Close"].pct_change().dropna()
         if (
             len(base_ret) < 2
             or len(und_ret) < 2
