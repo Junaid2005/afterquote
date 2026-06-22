@@ -6,18 +6,18 @@ import pandas as pd
 from ._security_pair import SecurityPair
 
 
-def benchmark(pair: SecurityPair, days: int = 30) -> pd.DataFrame:
+def benchmark(pair: SecurityPair, days: int = 90) -> pd.DataFrame:
     """Backtest synthetic pricing against actual next-day opens.
 
     Returns a DataFrame indexed by session date with columns:
         base_close, synth_open, actual_open, residual, direction_correct
     """
 
-    # +30 buffer: calendar days > trading days due to weekends/holidays
-    period = f"{days + 30}d"
+    end = pd.Timestamp.now(tz="UTC")
+    start = end - pd.Timedelta(days=days)
 
-    base_daily = pair.base_yf.yf_ticker.history(period=period, interval="1d")
-    und_daily = pair.underlying_yf.yf_ticker.history(period=period, interval="1d")
+    base_daily = pair.base_yf.get_history(start=start, end=end, interval="1d")
+    und_daily = pair.underlying_yf.get_history(start=start, end=end, interval="1d")
 
     # Strip timezone so LSE (+01:00) and NYSE (-04:00) date labels align
     base_daily.index = base_daily.index.normalize().tz_localize(None)
@@ -30,7 +30,7 @@ def benchmark(pair: SecurityPair, days: int = 30) -> pd.DataFrame:
     und_return = und_gap * und_intra
 
     if pair.ccy_pair_yf is not None:
-        fx_daily = pair.ccy_pair_yf.yf_ticker.history(period=period, interval="1d")
+        fx_daily = pair.ccy_pair_yf.get_history(start=start, end=end, interval="1d")
         fx_daily.index = fx_daily.index.normalize().tz_localize(None)
         fx_daily = fx_daily.reindex(und_daily.index).ffill().bfill()
         fx_gap, fx_intra = SecurityPair._candle_returns(

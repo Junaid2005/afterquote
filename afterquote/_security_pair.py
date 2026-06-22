@@ -3,6 +3,7 @@
 from dataclasses import dataclass, asdict
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 from ._yfinance_wrapper import YFinanceSecurity
 from ._market_calendar import MarketCalendar
@@ -19,6 +20,8 @@ class QuoteInfo:
     base_close_price: Optional[float] = None
     adj_percent_return: Optional[float] = None
     quote_price: Optional[float] = None
+    lower_bound: Optional[float] = None
+    upper_bound: Optional[float] = None
 
     def to_frame(self) -> pd.DataFrame:
         data = {k: v for k, v in asdict(self).items() if v is not None}
@@ -78,8 +81,17 @@ class SecurityPair:
             self.base_yf.get_exchange()
         ) and self.calendar.is_exchange_open(self.underlying_yf.get_exchange())
 
-    def info(self, as_of: Optional[pd.Timestamp] = None) -> pd.DataFrame:
-        """Returns a df with the latest info for the base security"""
+    def info(
+        self,
+        as_of: Optional[pd.Timestamp] = None,
+        confidence: Optional[float] = None,
+    ) -> pd.DataFrame:
+        """Returns a df with the latest info for the base security.
+
+        If ``confidence`` is set (e.g. 0.95), attaches ``lower_bound``/``upper_bound``
+        from the benchmark's empirical residual distribution. Only the synthetic
+        path receives a band.
+        """
 
         if as_of is None:
             as_of = pd.Timestamp.now(tz="UTC")
@@ -115,6 +127,12 @@ class SecurityPair:
 
         change = pricing_data["Impl_Close"].iloc[-1] - pricing_data["Impl_Open"].iloc[0]
         leveraged_return = (change / pricing_data["Impl_Open"].iloc[0]) * 100
+        quote_price = pricing_data["Impl_Close"].iloc[-1]
+
+        lower_bound: Optional[float] = None
+        upper_bound: Optional[float] = None
+        if confidence is not None:
+            lower_bound, upper_bound = self._confidence_band(quote_price, confidence)
 
         return QuoteInfo(
             base_security=self.base_yf.ticker,
@@ -125,8 +143,27 @@ class SecurityPair:
             base_close_time=pricing_data.index[0],
             base_close_price=close_price,
             adj_percent_return=leveraged_return,
-            quote_price=pricing_data["Impl_Close"].iloc[-1],
+            quote_price=quote_price,
+            lower_bound=lower_bound,
+            upper_bound=upper_bound,
         ).to_frame()
+
+    def _confidence_band(
+        self, quote_price: float, confidence: float
+    ) -> tuple[float, float]:
+        """Empirical confidence band around ``quote_price``."""
+        from ._benchmark import benchmark
+
+        residuals = benchmark(self).residual.dropna()
+        if residuals.empty:
+            raise ValueError(
+                "Cannot compute confidence band: benchmark returned no "
+                "valid residuals (insufficient historical overlap)."
+            )
+        alpha = 1.0 - confidence
+        low_pct, high_pct = 100 * alpha / 2, 100 * (1 - alpha / 2)
+        low_err, high_err = np.percentile(residuals, [low_pct, high_pct])
+        return quote_price + low_err, quote_price + high_err
 
     def pricing(
         self, interval: str = "1m", as_of: Optional[pd.Timestamp] = None

@@ -27,7 +27,6 @@ def _make_daily_ohlc(closes, opens=None, start="2026-05-01"):
 
 def _make_benchmark_pair(base_closes, und_closes, leverage=1, fx_closes=None):
     """Wire up a pair with daily history suitable for benchmark()."""
-    from tests.conftest import FakeYFinanceSecurity
 
     base_daily = _make_daily_ohlc(base_closes)
     und_daily = _make_daily_ohlc(und_closes)
@@ -50,27 +49,16 @@ def _make_benchmark_pair(base_closes, und_closes, leverage=1, fx_closes=None):
     dummy_close = make_ohlc(
         [(100.0, 100.0, 100.0, 100.0)], start="2026-05-01", tz="Europe/London"
     )
-    pair = make_security_pair(
+    return make_security_pair(
         base_info,
         dummy_close,
         und_info,
-        und_daily,
+        dummy_close,
         close_time=pd.Timestamp("2026-05-01 16:30:00+01:00"),
+        base_daily=base_daily,
+        underlying_daily=und_daily,
+        fx_daily=(_make_daily_ohlc(fx_closes) if fx_closes is not None else None),
     )
-
-    pair.base_yf.yf_ticker = type("T", (), {"history": lambda self, **kw: base_daily})()
-    pair.underlying_yf.yf_ticker = type(
-        "T", (), {"history": lambda self, **kw: und_daily}
-    )()
-
-    if fx_closes is not None:
-        fx_daily = _make_daily_ohlc(fx_closes)
-        pair.ccy_pair_yf = FakeYFinanceSecurity("FX", {}, fx_daily)
-        pair.ccy_pair_yf.yf_ticker = type(
-            "T", (), {"history": lambda self, **kw: fx_daily}
-        )()
-
-    return pair
 
 
 class TestBenchmarkOutput:
