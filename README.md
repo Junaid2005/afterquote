@@ -22,42 +22,82 @@ pip install afterquote
 ```
 
 ### Locally:
-
 ```bash
 pip install -e .
 ```
 
 ## Usage
 
+### Synthetic quote
 ```python
 from afterquote import SecurityPair
 
-pair = SecurityPair("3USL.L", "SPY")
+pair = SecurityPair("3TSL.L", "TSLA")
 print(pair.info())
 print(pair.pricing())
 ```
 
-## Example Output
-```text
-                          base_security underlying_security  base_is_live  leverage           base_close_time  base_close_price  adj_percent_return  quote_price
-quote_time
-2026-06-19 00:59:00+01:00        3USL.L                 SPY         False         3 2026-06-18 16:30:00+01:00        177.869995            0.621451   178.975369
+### Confidence band
+```python
+pair = SecurityPair("3TSL.L", "TSLA")
+print(pair.info(confidence=0.95))
+```
+Attaches `lower_bound`/`upper_bound` from the benchmark's empirical residual distribution — no Gaussian assumption.
+
+### Correlation health check
+```python
+pair = SecurityPair("3TSL.L", "TSLA")
+print(pair.correlation())
+```
+Returns Pearson daily-return correlation. Emits `UserWarning` when `|corr| < 0.5`.
+
+### Benchmark
+```python
+from afterquote import benchmark, metrics
+
+pair = SecurityPair("3TSL.L", "TSLA")
+results = benchmark(pair, days=90)
+print(metrics(results))
 ```
 
+### Holdings P&L
+```python
+from afterquote import portfolio_pnl
+
+print(portfolio_pnl("holdings.csv"))
+```
+
+### CLI
+```bash
+afterquote 3TSL.L TSLA
+afterquote 3TSL.L TSLA --as-of "2026-06-18 19:00"
+afterquote 3TSL.L TSLA --pricing
+```
+
+## Demo pairs
+
+| Pair | Leverage | FX | Notes |
+|------|----------|----|-------|
+| `3TSL.L` / `TSLA` | 3x | GBp/USD | Cross-currency flagship — both leverage and FX fire |
+| `3USL.L` / `SPY` | 3x | None | Same-currency contrast — leverage only |
+
+## Example output
+
+### `info()`
+```text
+                          base_security underlying_security  base_is_live  leverage           base_close_time  base_close_price  adj_percent_return  quote_price  lower_bound  upper_bound
+quote_time
+2026-06-19 00:59:00+01:00        3TSL.L                 TSLA         False         3 2026-06-18 16:30:00+01:00        177.869995            0.621451   178.975369      176.420   181.530
+```
+
+### `pricing()`
 ```text
                             Impl_Open   Impl_High    Impl_Low  Impl_Close
 Datetime
 2026-06-18 16:30:00+01:00  177.869995  178.077587  177.733974  178.070422
 2026-06-18 16:31:00+01:00  178.070422  178.185074  177.941470  177.941470
 2026-06-18 16:32:00+01:00  177.927178  177.962971  177.769626  177.884217
-2026-06-18 16:33:00+01:00  177.884217  177.934294  177.619327  177.741023
-2026-06-18 16:34:00+01:00  177.762466  178.141756  177.762466  177.991464
-...                                ...          ...          ...          ...
-2026-06-19 00:55:00+01:00  179.061663  179.147951  179.040091  179.090425
-2026-06-19 00:56:00+01:00  179.083234  179.131847  178.953792  179.004130
-2026-06-19 00:57:00+01:00  179.004130  179.032887  178.982563  179.004130
-2026-06-19 00:58:00+01:00  178.986158  179.025695  178.960997  179.025695
-2026-06-19 00:59:00+01:00  179.007721  179.061640  178.946613  178.975369
+...
 ```
 
 ## Testing

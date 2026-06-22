@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-06-22
+
+### Added
+
+- **`as_of` parameter** — `pricing()` and `info()` accept a point-in-time timestamp for historical queries. Resolves to `now()` if omitted.
+- **FX adjustment** — cross-currency pairs (e.g. `3TSL.L` in GBp vs `TSLA` in USD) now fetch the FX rate and apply it as a 1x multiplicative leg alongside the leveraged underlying return. GBp normalised to GBP.
+- **CLI** — `afterquote BASE UNDERLYING [--as-of] [--pricing]` terminal entrypoint via `[project.scripts]`.
+- **Holdings** — `portfolio_pnl(path, as_of=None)` reads CSV/JSON with `base,underlying,quantity` columns, returns per-position P&L + total. `pair_factory` injectable for tests.
+- **Cache** — `lru_cache(maxsize=128)` on historical yfinance fetches, keyed by ticker + window + interval. Live price paths bypass the cache.
+- **Benchmark** — `benchmark(pair, days=90)` walks each base trading session, applies leveraged + FX daily return to the prior close, compares synthetic open to actual next-day open. `metrics(results)` returns RMSE, MAE, direction hit-rate, tracking error, sample size.
+- **Confidence band** — `info(confidence=0.95)` attaches `lower_bound`/`upper_bound` on `QuoteInfo` from the benchmark's empirical residual percentiles. No Gaussian assumption. Honest framing: first-order, assumes tomorrow's error is drawn from the last ~60 sessions' residuals.
+- **Correlation health check** — `pair.correlation(days=90)` returns Pearson daily-return correlation between base and underlying. Emits `UserWarning` when `|corr| < 0.5`.
+
+### Changed
+
+- Demo pair changed from `3USL.L`/`SPY` to `3TSL.L`/`TSLA` — exercises both leverage and FX on one pair.
+- `requires-python` bumped from `>=3.8` to `>=3.10`.
+- `_candle_returns` refactored to a static method, shared by underlying and FX legs.
+- Benchmark default `days` raised from 30 to 90 for stable residual percentiles.
+
+---
+
 ## [0.3.0] - 2026-06-20
 
 ### Fixed
