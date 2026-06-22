@@ -42,6 +42,17 @@ Seven modules in `afterquote/`:
 
 Public API: `SecurityPair(base, underlying)` with `.info()`, `.pricing()`, `.correlation()`. Module-level `benchmark()`, `metrics()`, `portfolio_pnl()`.
 
+## The pricing model
+
+When the base exchange is closed but the underlying is trading, `pricing()` synthesizes OHLC bars for the base by applying the underlying's moves (×leverage) onto the base's last close price.
+
+Key principles:
+- **Single anchor** — every synthetic price grows from the base's last **Close** (the settlement), not its Open. One seed, not two.
+- **Two legs per bar** — inter-bar gap (underlying open vs prev close) then intra-bar move (underlying close vs its open). Multiplied, not added, because they're sequential.
+- **Carry-forward** — `Impl_Open[t] == gap applied to Impl_Close[t-1]`. One continuous chain.
+- **Leverage on everything** — Open, High, Low, Close all get the leverage factor. A 3x ETC's entire candle scales 3x.
+- **Candles valid by construction** — High/Low/Close all derive from the same `Impl_Open`, so `High >= max(Open,Close) >= Low` always holds.
+
 ## FX adjustment
 
 When base and underlying trade in different currencies, `pricing()` fetches the FX rate and applies it as a 1x multiplicative leg alongside the leveraged underlying return. GBp normalised to GBP. Same `_candle_returns` decomposition (gap + intra) shared by both legs.
