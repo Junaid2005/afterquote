@@ -38,7 +38,7 @@ Seven modules in `afterquote/`:
 - `_security_pair.py` — `SecurityPair`: the main API. Holds a base + underlying, produces synthetic quotes. `QuoteInfo` dataclass structures the output. `correlation()` health check. `info(confidence=)` confidence band.
 - `_benchmark.py` — `benchmark(pair, days=90)`: daily backtest of synthetic vs actual next-day open. `metrics(results)`: RMSE, MAE, direction hit-rate, tracking error.
 - `_holdings.py` — `portfolio_pnl(path, as_of=None)`: CSV/JSON portfolio ingestion with per-position after-hours P&L.
-- `_cli.py` — `main(argv=None)`: argparse CLI entrypoint.
+- `_cli.py` — `main(argv=None)`: argparse CLI entrypoint. Flags: `--pricing`, `--benchmark`, `--correlation`, `--confidence`, `--holdings PATH`, `--as-of`. Mode flags are mutually exclusive.
 
 Public API: `SecurityPair(base, underlying)` with `.info()`, `.pricing()`, `.correlation()`. Module-level `benchmark()`, `metrics()`, `portfolio_pnl()`.
 
