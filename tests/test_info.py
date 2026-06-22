@@ -49,6 +49,47 @@ class TestInfoSynthetic:
         assert info["quote_price"].iloc[0] == pricing["Impl_Close"].iloc[-1]
 
 
+class TestInfoAsOf:
+    """as_of= parameter flows through info() correctly."""
+
+    def test_as_of_synthetic_has_adj_return(self, simple_pair):
+        as_of = pd.Timestamp("2026-06-18 19:00:00+01:00")
+        info = simple_pair.info(as_of=as_of)
+        assert not bool(info["base_is_live"].iloc[0])
+        assert "adj_percent_return" in info.columns
+
+    def test_as_of_quote_price_is_last_impl_close(self, simple_pair):
+        as_of = pd.Timestamp("2026-06-18 19:00:00+01:00")
+        info = simple_pair.info(as_of=as_of)
+        pricing = simple_pair.pricing(as_of=as_of)
+        assert info["quote_price"].iloc[0] == pricing["Impl_Close"].iloc[-1]
+
+    def test_as_of_live_base_returns_live_info(self):
+        base_close = make_ohlc(
+            [(200.0, 200.5, 199.5, 200.0)], start="2026-06-18 16:30", tz="Europe/London"
+        )
+        pair = make_security_pair(
+            {
+                "longName": "2x Lev",
+                "leverage": 2,
+                "exchange": "LSE",
+                "timeZoneFullName": "Europe/London",
+            },
+            base_close,
+            {
+                "longName": "Under",
+                "leverage": 1,
+                "exchange": "PCX",
+                "timeZoneFullName": "America/New_York",
+            },
+            base_close,
+            base_open=True,
+            close_time=pd.Timestamp("2026-06-18 16:30:00+01:00"),
+        )
+        info = pair.info(as_of=pd.Timestamp("2026-06-18 13:00:00+01:00"))
+        assert bool(info["base_is_live"].iloc[0])
+
+
 class TestInfoNoData:
     """When underlying has no data after base close, return base close as quote."""
 

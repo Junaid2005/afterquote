@@ -141,3 +141,51 @@ class TestPricingColumns:
             "Impl_Low",
             "Impl_Close",
         ]
+
+
+class TestPricingAsOf:
+    """as_of= parameter flows through without altering the math (fakes don't filter)."""
+
+    def test_as_of_returns_correct_columns(self, simple_pair):
+        as_of = pd.Timestamp("2026-06-18 19:00:00+01:00")
+        pricing = simple_pair.pricing(as_of=as_of)
+        assert list(pricing.columns) == [
+            "Impl_Open",
+            "Impl_High",
+            "Impl_Low",
+            "Impl_Close",
+        ]
+
+    def test_as_of_preserves_anchor_and_leverage(self, simple_pair):
+        as_of = pd.Timestamp("2026-06-18 19:00:00+01:00")
+        pricing = simple_pair.pricing(as_of=as_of)
+        # anchor=200, underlying +1%, leverage=2 → first close = 204
+        assert pricing["Impl_Close"].iloc[0] == 204.0
+
+    def test_as_of_raises_when_base_is_live(self):
+        import pytest
+        from tests.conftest import make_ohlc, make_security_pair
+
+        base_close = make_ohlc(
+            [(200.0, 200.5, 199.5, 200.0)], start="2026-06-18 16:30", tz="Europe/London"
+        )
+        pair = make_security_pair(
+            {
+                "longName": "2x Lev",
+                "leverage": 2,
+                "exchange": "LSE",
+                "timeZoneFullName": "Europe/London",
+            },
+            base_close,
+            {
+                "longName": "Under",
+                "leverage": 1,
+                "exchange": "PCX",
+                "timeZoneFullName": "America/New_York",
+            },
+            base_close,
+            base_open=True,
+            close_time=pd.Timestamp("2026-06-18 16:30:00+01:00"),
+        )
+        with pytest.raises(RuntimeError):
+            pair.pricing(as_of=pd.Timestamp("2026-06-18 17:00:00+01:00"))

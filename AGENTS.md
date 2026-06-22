@@ -31,13 +31,16 @@ pytest tests/ --runlive   # + live yfinance tests (manual, pre-release)
 
 ## Architecture
 
-Three modules in `afterquote/`:
+Seven modules in `afterquote/`:
 
-- `_yfinance_wrapper.py` — `YFinanceSecurity`: wraps a yfinance ticker. Provides `info`, `leverage`, `exchange`, `timezone`, `get_price_at(timestamp)`.
+- `_yfinance_wrapper.py` — `YFinanceSecurity`: wraps a yfinance ticker. Provides `info`, `leverage`, `exchange`, `timezone`, `currency`, `get_price_at(timestamp)`, `get_history(start, end, interval)`.
 - `_market_calendar.py` — `MarketCalendar`: wraps pandas_market_calendars. Maps yfinance exchange codes (NMS, PCX, LSE, etc.) to calendar names. Provides `is_exchange_open`, `get_closing_time`, `get_exchange_tz`.
-- `_security_pair.py` — `SecurityPair`: the main API. Holds a base + underlying, produces synthetic quotes. `QuoteInfo` dataclass structures the output.
+- `_security_pair.py` — `SecurityPair`: the main API. Holds a base + underlying, produces synthetic quotes. `QuoteInfo` dataclass structures the output. `correlation()` health check. `info(confidence=)` confidence band.
+- `_benchmark.py` — `benchmark(pair, days=90)`: daily backtest of synthetic vs actual next-day open. `metrics(results)`: RMSE, MAE, direction hit-rate, tracking error.
+- `_holdings.py` — `portfolio_pnl(path, as_of=None)`: CSV/JSON portfolio ingestion with per-position after-hours P&L.
+- `_cli.py` — `main(argv=None)`: argparse CLI entrypoint. Flags: `--pricing`, `--benchmark`, `--correlation`, `--confidence`, `--holdings PATH`, `--as-of`. Mode flags are mutually exclusive.
 
-Public API: `SecurityPair(base, underlying)` with `.info()` and `.pricing()`.
+Public API: `SecurityPair(base, underlying)` with `.info()`, `.pricing()`, `.correlation()`. Module-level `benchmark()`, `metrics()`, `portfolio_pnl()`.
 
 ## The pricing model
 
@@ -49,6 +52,18 @@ Key principles:
 - **Carry-forward** — `Impl_Open[t] == gap applied to Impl_Close[t-1]`. One continuous chain.
 - **Leverage on everything** — Open, High, Low, Close all get the leverage factor. A 3x ETC's entire candle scales 3x.
 - **Candles valid by construction** — High/Low/Close all derive from the same `Impl_Open`, so `High >= max(Open,Close) >= Low` always holds.
+
+## FX adjustment
+
+When base and underlying trade in different currencies, `pricing()` fetches the FX rate and applies it as a 1x multiplicative leg alongside the leveraged underlying return. GBp normalised to GBP. Same `_candle_returns` decomposition (gap + intra) shared by both legs.
+
+## Confidence band
+
+`info(confidence=0.95)` attaches `lower_bound`/`upper_bound` from the benchmark's empirical residual percentiles. No Gaussian assumption. First-order: assumes tomorrow's error is drawn from the last ~60 sessions' residuals.
+
+## Correlation health check
+
+`pair.correlation(days=90)` returns Pearson daily-return correlation. Emits `UserWarning` when `|corr| < 0.5`.
 
 ## Tests
 

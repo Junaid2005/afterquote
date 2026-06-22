@@ -8,17 +8,30 @@ from afterquote._security_pair import SecurityPair
 
 
 class FakeYFinanceSecurity:
-    """Drop-in replacement for YFinanceSecurity with hardcoded data."""
+    """Drop-in replacement for YFinanceSecurity with hardcoded data.
 
-    def __init__(self, ticker, info, history_df):
+    ``history_df`` is the intraday series returned by ``get_history`` (the
+    pricing path). ``daily_df`` (optional) is what ``yf_ticker.history`` returns
+    when ``interval="1d"`` — the benchmark path. Letting the fake dispatch on
+    interval lets a single pair run both pricing() and benchmark() in tests
+    without overriding ``yf_ticker``.
+    """
+
+    def __init__(self, ticker, info, history_df, daily_df=None):
         self.ticker = ticker
         self._info = info
         self._history = history_df
-        self.yf_ticker = (
-            self  # pricing() calls self.underlying_yf.yf_ticker.history(...)
-        )
+        self._daily = daily_df
+        self.yf_ticker = self  # benchmark() calls .yf_ticker.history interval="1d"
 
-    def history(self, start=None, end=None, interval="1m", prepost=True):
+    def history(self, start=None, end=None, interval="1m", prepost=True, period=None):
+        if interval == "1d" and self._daily is not None:
+            return self._daily
+        return self._history
+
+    def get_history(self, start=None, end=None, interval="1m"):
+        if interval == "1d" and self._daily is not None:
+            return self._daily
         return self._history
 
     def is_real_security(self) -> bool:
@@ -29,6 +42,9 @@ class FakeYFinanceSecurity:
 
     def get_timezone(self):
         return pytz.timezone(self._info["timeZoneFullName"])
+
+    def get_currency(self) -> str:
+        return self._info.get("currency", "USD").upper()
 
     def get_exchange(self) -> str:
         return self._info["exchange"]
@@ -59,7 +75,7 @@ class FakeMarketCalendar:
             return self._base_open
         return self._underlying_open
 
-    def get_closing_time(self, exchange) -> pd.Timestamp:
+    def get_closing_time(self, exchange, as_of=None) -> pd.Timestamp:
         return self._close_time
 
     def get_exchange_tz(self, exchange):
@@ -87,14 +103,29 @@ def make_security_pair(
     underlying_open=True,
     close_time=None,
     tz="America/New_York",
+    fx_history=None,
+    base_daily=None,
+    underlying_daily=None,
+    fx_daily=None,
 ):
-    """Build a SecurityPair with fakes wired in — no network calls."""
+    """Build a SecurityPair with fakes wired in — no network calls.
+
+    Pass ``base_daily``/``underlying_daily``/``fx_daily`` to give the benchmark
+    path a daily-resolution series distinct from the intraday history used by
+    pricing().
+    """
     pair = SecurityPair.__new__(SecurityPair)
-    pair.base_yf = FakeYFinanceSecurity("BASE", base_info, base_history)
+    pair.base_yf = FakeYFinanceSecurity("BASE", base_info, base_history, base_daily)
     pair.underlying_yf = FakeYFinanceSecurity(
-        "UNDER", underlying_info, underlying_history
+        "UNDER", underlying_info, underlying_history, underlying_daily
     )
     pair.calendar = FakeMarketCalendar(base_open, underlying_open, close_time, tz)
+    # Inject fake FX security when provided — prevents any network calls in FX path
+    pair.ccy_pair_yf = (
+        FakeYFinanceSecurity("FX", {}, fx_history, fx_daily)
+        if fx_history is not None
+        else None
+    )
     return pair
 
 
